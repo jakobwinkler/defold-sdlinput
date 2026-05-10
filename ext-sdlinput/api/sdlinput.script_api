@@ -1,0 +1,674 @@
+{
+  "name": "sdlinput",
+  "description": "SDLInput — raw SDL3 gamepad/joystick/HID subsystem for Defold. Provides gamepad enumeration, state reading (buttons, axes, sensors), rumble/LED control, raw HID report access, and custom controller mapping support. Works on desktop and WASM.",
+  "namespace": "sdlinput",
+  "types": [
+    {
+      "name": "gamepad_handle",
+      "description": "Opaque handle to an open gamepad, returned by gamepad_open(). Pass to all gamepad_* functions that operate on a specific device."
+    },
+    {
+      "name": "hid_handle",
+      "description": "Opaque handle to an open HID device, returned by hid_open() or hid_open_path(). Pass to all hid_* functions that operate on a specific device."
+    },
+    {
+      "name": "button_table",
+      "description": "Table returned by gamepad_get_buttons(). Contains boolean fields: a, b, x, y, dpad_up, dpad_down, dpad_left, dpad_right, left_shoulder, right_shoulder, left_stick, right_stick, start, back, guide, misc1, paddle1, paddle2, paddle3, paddle4, touchpad. Each field is true if the button is pressed."
+    },
+    {
+      "name": "sensor_table",
+      "description": "Table returned by gamepad_get_sensor(). Contains number fields: x, y, z representing the sensor reading vector."
+    },
+    {
+      "name": "hid_device_info",
+      "description": "Table returned by hid_enumerate(). Each entry describes a HID device with fields: path (string), vendor_id (number), product_id (number), serial_number (string), manufacturer_string (string), product_string (string), usage_page (number), usage (number), interface_number (number)."
+    }
+  ],
+  "constants": [],
+  "functions": [
+    {
+      "name": "init",
+      "description": "Initialize SDL3 gamepad and HID subsystems. Must be called once before any other sdlinput function. Safe to call multiple times — subsequent calls are no-ops.",
+      "parameters": [],
+      "returnvalues": [
+        {
+          "name": "ok",
+          "type": "bool",
+          "description": "true on success"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if initialization failed, nil on success"
+        }
+      ]
+    },
+    {
+      "name": "quit",
+      "description": "Shut down SDL3 gamepad and HID subsystems. Closes all open gamepad and HID handles. After calling quit(), all handles become invalid. Call init() again to resume.",
+      "parameters": [],
+      "returnvalues": []
+    },
+    {
+      "name": "pump_events",
+      "description": "Process SDL3 input events. Must be called once per frame before reading gamepad state (buttons, axis, sensor). Without this, gamepad state reads return stale cached data because Defold uses SDL2 internally and does not pump the SDL3 event queue.",
+      "parameters": [],
+      "returnvalues": []
+    },
+    {
+      "name": "num_gamepads",
+      "description": "Return the number of connected gamepads / joysticks that are currently detected by SDL3. Device indices range from 0 to count-1. Pass to gamepad_open() to open a specific device.",
+      "parameters": [],
+      "returnvalues": [
+        {
+          "name": "count",
+          "type": "number",
+          "description": "Number of connected gamepads, or nil on failure"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if query failed, nil on success"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_name",
+      "description": "Return the human-readable product name of the gamepad at the given device index. Does not require the gamepad to be open.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "number",
+          "description": "Device index (0 to num_gamepads()-1)"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Gamepad product name, or nil on failure"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if index is out of range, nil on success"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_open",
+      "description": "Open a gamepad for reading state. Returns an opaque handle that is used by all other gamepad_* functions. Each call creates a new handle to the same device. Call gamepad_close() on old handles to avoid leaks.",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "number",
+          "description": "Device index (0 to num_gamepads()-1)"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Opaque handle to the opened gamepad, or nil on failure"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if open failed, nil on success"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_close",
+      "description": "Close an open gamepad handle. The handle becomes invalid after this call. Safe to call on a handle that is already closed or nil.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Gamepad handle returned by gamepad_open()"
+        }
+      ],
+      "returnvalues": []
+    },
+    {
+      "name": "gamepad_connected",
+      "description": "Check whether a gamepad handle still refers to a connected device. Returns false if the device was unplugged or the handle was closed.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Gamepad handle returned by gamepad_open()"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "connected",
+          "type": "bool",
+          "description": "true if the gamepad is still connected"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_get_type",
+      "description": "Return the type string for an open gamepad. Possible values: unknown, standard, xbox_360, xbox_one, ps3, ps4, ps5, nintendo_switch_pro, nintendo_switch_joycon_left, nintendo_switch_joycon_right, nintendo_switch_joycon_pair, shield, stadia, amazon_luna, google_teac, nvidia_shield_2017, nexus_player, razer_kishi.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Gamepad handle returned by gamepad_open()"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Gamepad type string, or unknown if type cannot be determined"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_get_vid",
+      "description": "Return the USB vendor ID (VID) of an open gamepad.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Gamepad handle returned by gamepad_open()"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "vid",
+          "type": "number",
+          "description": "USB vendor ID (16-bit integer)"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_get_pid",
+      "description": "Return the USB product ID (PID) of an open gamepad.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Gamepad handle returned by gamepad_open()"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "pid",
+          "type": "number",
+          "description": "USB product ID (16-bit integer)"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_get_buttons",
+      "description": "Return a table of button states for an open gamepad. Call pump_events() once per frame before this. The returned table contains boolean fields: a, b, x, y, dpad_up, dpad_down, dpad_left, dpad_right, left_shoulder, right_shoulder, left_stick, right_stick, start, back, guide, misc1, paddle1, paddle2, paddle3, paddle4, touchpad. Each field is true if pressed.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Gamepad handle returned by gamepad_open()"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "buttons",
+          "type": "button_table",
+          "description": "Table of button states with boolean fields for each button"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_get_axis",
+      "description": "Return the current value of a gamepad axis. Call pump_events() once per frame before this. Axis values range from -1.0 (full left/up) to 1.0 (full right/down). Triggers range from 0.0 (rest) to 1.0 (fully pressed).",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Gamepad handle returned by gamepad_open()"
+        },
+        {
+          "name": "axis",
+          "type": "string",
+          "description": "Axis name: leftx, lefty, rightx, righty, left_trigger, right_trigger"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "value",
+          "type": "number",
+          "description": "Axis value in range -1.0 to 1.0 (triggers: 0.0 to 1.0)"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_get_sensor",
+      "description": "Return the current reading from a gamepad sensor (gyroscope or accelerometer). Call pump_events() once per frame before this. Returns a table with fields x, y, z containing the sensor data. Supported only on controllers with built-in IMU (e.g., PS5, Nintendo Switch Pro).",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Gamepad handle returned by gamepad_open()"
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Sensor type: gyro or accel"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "data",
+          "type": "sensor_table",
+          "description": "Table with x, y, z fields containing sensor reading, or nil if unavailable"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_set_sensor_enabled",
+      "description": "Enable or disable a gamepad sensor (gyroscope or accelerometer). Must be called before gamepad_get_sensor() to start receiving sensor data. Supported only on controllers with built-in IMU (e.g., PS5, Nintendo Switch Pro). Returns true if the sensor type was enabled/disabled successfully.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Gamepad handle returned by gamepad_open()"
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Sensor type: gyro or accel"
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "description": "true to enable, false to disable"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "ok",
+          "type": "bool",
+          "description": "true on success"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if sensor type not supported or failed, nil on success"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_is_sensor_enabled",
+      "description": "Check whether a gamepad sensor type is currently enabled. Returns true if the sensor is active and returning data.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Gamepad handle returned by gamepad_open()"
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Sensor type: gyro or accel"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "description": "true if sensor is enabled and returning data"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_rumble",
+      "description": "Trigger rumble feedback on a gamepad. Left motor is the low-frequency (heavy) motor, right motor is the high-frequency (light) motor. Motor values range from 0.0 (off) to 1.0 (max). Duration is in milliseconds. Not all controllers support rumble.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Gamepad handle returned by gamepad_open()"
+        },
+        {
+          "name": "left_motor",
+          "type": "number",
+          "description": "Left motor intensity (0.0 to 1.0)"
+        },
+        {
+          "name": "right_motor",
+          "type": "number",
+          "description": "Right motor intensity (0.0 to 1.0)"
+        },
+        {
+          "name": "duration_ms",
+          "type": "number",
+          "description": "Rumble duration in milliseconds"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "ok",
+          "type": "bool",
+          "description": "true on success"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if rumble not supported or failed, nil on success"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_has_led",
+      "description": "Check whether an open gamepad supports LED color control (e.g., PS5, PS4, Switch Pro controllers).",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Gamepad handle returned by gamepad_open()"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "has_led",
+          "type": "bool",
+          "description": "true if the gamepad supports LED color control"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_set_led",
+      "description": "Set the LED color on a gamepad that supports it. RGB values range from 0 to 255. Effect is immediate. No-op on controllers without an LED.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "gamepad_handle",
+          "description": "Gamepad handle returned by gamepad_open()"
+        },
+        {
+          "name": "r",
+          "type": "number",
+          "description": "Red component (0-255)"
+        },
+        {
+          "name": "g",
+          "type": "number",
+          "description": "Green component (0-255)"
+        },
+        {
+          "name": "b",
+          "type": "number",
+          "description": "Blue component (0-255)"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "ok",
+          "type": "bool",
+          "description": "true on success"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if LED set failed, nil on success"
+        }
+      ]
+    },
+    {
+      "name": "hid_enumerate",
+      "description": "Enumerate HID devices matching the given vendor ID and product ID. Set vid or pid to 0 for wildcard matching. Returns a table array where each entry describes a detected HID device with fields: path, vendor_id, product_id, serial_number, manufacturer_string, product_string, usage_page, usage, interface_number.",
+      "parameters": [
+        {
+          "name": "vid",
+          "type": "number",
+          "description": "USB vendor ID to match, or 0 for wildcard"
+        },
+        {
+          "name": "pid",
+          "type": "number",
+          "description": "USB product ID to match, or 0 for wildcard"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "devices",
+          "type": "table",
+          "description": "Array of hid_device_info tables, or nil on failure"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if enumeration failed, nil on success"
+        }
+      ]
+    },
+    {
+      "name": "hid_open",
+      "description": "Open a HID device by vendor ID and product ID. Opens the first matching device found by enumeration. Returns an opaque handle for use with other hid_* functions.",
+      "parameters": [
+        {
+          "name": "vid",
+          "type": "number",
+          "description": "USB vendor ID"
+        },
+        {
+          "name": "pid",
+          "type": "number",
+          "description": "USB product ID"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "handle",
+          "type": "hid_handle",
+          "description": "Opaque handle to the opened HID device, or nil on failure"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if open failed, nil on success"
+        }
+      ]
+    },
+    {
+      "name": "hid_open_path",
+      "description": "Open a HID device by a platform-specific path string (obtained from hid_enumerate). Useful for opening a specific device when multiple devices share the same VID/PID.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Device path string from hid_enumerate"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "handle",
+          "type": "hid_handle",
+          "description": "Opaque handle to the opened HID device, or nil on failure"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if open failed, nil on success"
+        }
+      ]
+    },
+    {
+      "name": "hid_close",
+      "description": "Close an open HID device handle. The handle becomes invalid after this call. Safe to call on a handle that is already closed or nil.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "hid_handle",
+          "description": "HID handle returned by hid_open() or hid_open_path()"
+        }
+      ],
+      "returnvalues": []
+    },
+    {
+      "name": "hid_read",
+      "description": "Read an input report from an open HID device. Returns the report as a string of bytes. timeout_ms: -1 blocks indefinitely, 0 is non-blocking, >0 is a timeout in milliseconds. CAUTION: This is a blocking call — calling it from the main update loop will freeze the frame.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "hid_handle",
+          "description": "HID handle returned by hid_open() or hid_open_path()"
+        },
+        {
+          "name": "len",
+          "type": "number",
+          "description": "Maximum number of bytes to read"
+        },
+        {
+          "name": "timeout_ms",
+          "type": "number",
+          "description": "Timeout in milliseconds (-1 = block, 0 = non-blocking, >0 = ms timeout)"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "data",
+          "type": "string",
+          "description": "Raw report data as a byte string, or nil on timeout/error"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if read failed, nil on success or timeout"
+        }
+      ]
+    },
+    {
+      "name": "hid_write",
+      "description": "Write an output report to an open HID device. The data string is sent as-is, including the first report ID byte if the device uses numbered reports. CAUTION: This is a blocking call — calling it from the main update loop will freeze the frame.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "hid_handle",
+          "description": "HID handle returned by hid_open() or hid_open_path()"
+        },
+        {
+          "name": "data_string",
+          "type": "string",
+          "description": "Raw report data as a byte string to send"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "count",
+          "type": "number",
+          "description": "Number of bytes actually written, or nil on failure"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if write failed, nil on success"
+        }
+      ]
+    },
+    {
+      "name": "hid_get_feature_report",
+      "description": "Get a feature report from an open HID device. report_id is the report ID to request (0 if the device does not use numbered reports). len is the expected report size. Returns the raw report data string. CAUTION: This is a blocking call — calling it from the main update loop will freeze the frame.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "hid_handle",
+          "description": "HID handle returned by hid_open() or hid_open_path()"
+        },
+        {
+          "name": "report_id",
+          "type": "number",
+          "description": "Report ID to request (0 if device does not use numbered reports)"
+        },
+        {
+          "name": "len",
+          "type": "number",
+          "description": "Expected report size in bytes"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "data",
+          "type": "string",
+          "description": "Raw feature report data as a byte string, or nil on failure"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if request failed, nil on success"
+        }
+      ]
+    },
+    {
+      "name": "hid_send_feature_report",
+      "description": "Send a feature report to an open HID device. The data string should include the report ID as the first byte if the device uses numbered reports. CAUTION: This is a blocking call — calling it from the main update loop will freeze the frame.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "hid_handle",
+          "description": "HID handle returned by hid_open() or hid_open_path()"
+        },
+        {
+          "name": "data_string",
+          "type": "string",
+          "description": "Raw feature report data as a byte string to send (first byte = report ID if using numbered reports)"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "count",
+          "type": "number",
+          "description": "Number of bytes actually sent, or nil on failure"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if send failed, nil on success"
+        }
+      ]
+    },
+    {
+      "name": "hid_error",
+      "description": "Return a descriptive error string for the last error on an open HID device. Returns an empty string if no error has occurred.",
+      "parameters": [
+        {
+          "name": "handle",
+          "type": "hid_handle",
+          "description": "HID handle returned by hid_open() or hid_open_path()"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "error_string",
+          "type": "string",
+          "description": "Human-readable error description, or empty string if no error"
+        }
+      ]
+    },
+    {
+      "name": "gamepad_add_mapping",
+      "description": "Add a custom controller mapping string to SDL3's mapping database. The mapping string follows the SDL gamecontrollerdb.txt format. Useful for adding support for controllers not recognized by the built-in SDL3 mapping database. Can be called any time after init().",
+      "parameters": [
+        {
+          "name": "mapping_string",
+          "type": "string",
+          "description": "Controller mapping string in SDL gamecontrollerdb.txt format"
+        }
+      ],
+      "returnvalues": [
+        {
+          "name": "ok",
+          "type": "bool",
+          "description": "true on success"
+        },
+        {
+          "name": "err",
+          "type": "string|nil",
+          "description": "Error message if mapping string is invalid or failed to add, nil on success"
+        }
+      ]
+    }
+  ]
+}

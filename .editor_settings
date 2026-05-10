@@ -1,0 +1,85 @@
+{
+  :bundle {
+    :last-bundle-command :project.bundle-linux
+  }
+  :code {
+    :breakpoints [
+    ]
+  }
+  :workflow {
+    :open-tabs [
+      [
+        [
+          "/ext-sdlinput/api/sdlinput.script_api"
+          :code
+        ]
+        [
+          "/ext-sdlinput/ext.manifest"
+          :code
+        ]
+        [
+          "/game.project"
+          :cljfx-form-view
+        ]
+        [
+          "/builtins/input/default.gamepads"
+          :cljfx-form-view
+        ]
+        [
+          "/main/empty.gamepads"
+          :cljfx-form-view
+        ]
+        [
+          "/ext-sdlinput/src/extension.cpp"
+          :code
+        ]
+        [
+          "/ext-sdlinput/src/sdlinput_bridge.cpp"
+          :code
+        ]
+        [
+          "/main/controller.script"
+          :code
+        ]
+      ]
+    ]
+    :recent-files [
+      [
+        "/ext-sdlinput/api/sdlinput.script_api"
+        :code
+      ]
+      [
+        "/builtins/input/default.gamepads"
+        :cljfx-form-view
+      ]
+      [
+        "/main/empty.gamepads"
+        :cljfx-form-view
+      ]
+      [
+        "/ext-sdlinput/ext.manifest"
+        :code
+      ]
+      [
+        "/ext-sdlinput/src/extension.cpp"
+        :code
+      ]
+      [
+        "/ext-sdlinput/src/sdlinput_bridge.cpp"
+        :code
+      ]
+      [
+        "/game.project"
+        :cljfx-form-view
+      ]
+      [
+        "/main/main.appmanifest"
+        :code
+      ]
+      [
+        "/main/controller.script"
+        :code
+      ]
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+# Build SDL3 as a static library for wasm-web (Emscripten)
+# Uses official emscripten/emsdk image (Debian-based)
+FROM docker.io/emscripten/emsdk:latest
+
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone SDL3
+RUN git clone --depth 1 --branch release-3.2.x https://github.com/libsdl-org/SDL /SDL
+
+WORKDIR /SDL
+
+# Configure with minimal subsystem set for WASM
+# Note: SDL_HIDAPI is OFF — no raw HID access in browser
+#       SDL_HAPTIC is OFF — rumble uses Gamepad API extensions (unreliable)
+#       SDL_POWER is OFF — battery API available but not critical
+#       SDL_SENSOR is ON — Generic Sensor API via emscripten
+RUN emcmake cmake -B build \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DSDL_STATIC=ON \
+    -DSDL_JOYSTICK=ON \
+    -DSDL_SENSOR=ON \
+    -DSDL_POWER=OFF \
+    -DSDL_HAPTIC=OFF \
+    -DSDL_HIDAPI=OFF \
+    -DSDL_VIDEO=OFF \
+    -DSDL_AUDIO=OFF \
+    -DSDL_RENDER=OFF \
+    -DSDL_GPU=OFF \
+    -DSDL_CAMERA=OFF \
+    -DSDL_DIALOG=OFF \
+    -DSDL_TRAY=OFF \
+    -DSDL_PROCESS=OFF \
+    -DSDL_STORAGE=OFF \
+    && emmake cmake --build build -j$(nproc)
+
+# Verify build output
+RUN ls -lh build/libSDL3.a && nm build/libSDL3.a | grep -q ' T SDL_GetGamepads' \
+    && echo "SDL3 WASM build OK" || echo "WARNING: SDL_GetGamepads not found"

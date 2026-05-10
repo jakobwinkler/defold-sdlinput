@@ -1,0 +1,19 @@
+name: "SDLInput"
+platforms:
+  x86_64-linux:
+    context:
+      libs: ["SDL3"]
+  x86_64-win32:
+    context:
+      libs: ["SDL3"]
+  x86_64-osx:
+    context:
+      frameworks: ["IOKit", "CoreFoundation", "GameController", "ForceFeedback"]
+      libs: ["SDL3"]
+  arm64-osx:
+    context:
+      frameworks: ["IOKit", "CoreFoundation", "GameController", "ForceFeedback"]
+      libs: ["SDL3"]
+  wasm-web:
+    context:
+      libs: ["SDL3"]

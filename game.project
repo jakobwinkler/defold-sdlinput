@@ -1,0 +1,23 @@
+[project]
+title = SDLInput
+version = 0.1
+
+[bootstrap]
+main_collection = /main/main.collectionc
+render = /main/render.renderc
+
+[display]
+width = 1280
+height = 720
+
+[script]
+shared_state = 1
+
+[input]
+game_binding = /builtins/input/all.input_bindingc
+
+[render]
+clear_color_red = 0.160156
+clear_color_green = 0.164063
+clear_color_blue = 0.183594
+

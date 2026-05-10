@@ -1,0 +1,17 @@
+function init(self)
+	self.clear_color = vmath.vector4(0.16, 0.164, 0.184, 1.0)
+	render.enable_state(graphics.STATE_DEPTH_TEST)
+end
+
+function update(self)
+	local w = render.get_window_width()
+	local h = render.get_window_height()
+
+	render.set_depth_mask(true)
+	render.clear({
+		[graphics.BUFFER_TYPE_COLOR0_BIT] = self.clear_color,
+		[graphics.BUFFER_TYPE_DEPTH_BIT] = 1
+	})
+
+	render.set_viewport(0, 0, w, h)
+end

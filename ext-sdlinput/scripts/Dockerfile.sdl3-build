@@ -1,0 +1,60 @@
+# Build SDL3 as a static library for x86_64-linux
+# Uses Ubuntu 20.04 to match extender's glibc ABI
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+    cmake \
+    build-essential \
+    git \
+    ca-certificates \
+    libudev-dev \
+    libdbus-1-dev \
+    libusb-1.0-0-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone SDL3 — pin to a specific tag for reproducible builds
+RUN git clone --depth 1 --branch release-3.2.x https://github.com/libsdl-org/SDL /SDL
+
+WORKDIR /SDL
+
+# Configure with minimal subsystem set
+RUN cmake -B build \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DSDL_STATIC=ON \
+    -DSDL_STATIC_PIC=ON \
+    -DSDL_UNIX_CONSOLE_BUILD=ON \
+    -DSDL_JOYSTICK=ON \
+    -DSDL_HIDAPI=ON \
+    -DSDL_SENSOR=ON \
+    -DSDL_HAPTIC=ON \
+    -DSDL_POWER=ON \
+    -DSDL_VIDEO=OFF \
+    -DSDL_AUDIO=OFF \
+    -DSDL_RENDER=OFF \
+    -DSDL_GPU=OFF \
+    -DSDL_CAMERA=OFF \
+    -DSDL_DIALOG=OFF \
+    -DSDL_TRAY=OFF \
+    -DSDL_PROCESS=OFF \
+    -DSDL_STORAGE=OFF \
+    -DSDL_X11=OFF \
+    -DSDL_WAYLAND=OFF \
+    -DSDL_OPENGL=OFF \
+    -DSDL_VULKAN=OFF \
+    -DSDL_METAL=OFF \
+    -DSDL_COCOA=OFF \
+    -DSDL_DIRECTX=OFF \
+    -DSDL_ALSA=OFF \
+    -DSDL_PULSEAUDIO=OFF \
+    -DSDL_PIPEWIRE=OFF \
+    -DSDL_IBUS=OFF \
+    -DSDL_FCITX=OFF \
+    -DSDL_LIBURING=OFF \
+    -DSDL_VIRTUAL_JOYSTICK=OFF \
+    -DSDL_HIDAPI_LIBUSB_SHARED=ON \
+    && cmake --build build -j$(nproc)
+
+# Verify no C23-specific symbols leaked
+RUN nm build/libSDL3.a | grep ' U __isoc23' && { echo "ERROR: C23 symbols found"; exit 1; } || echo "OK: no C23 symbols"
