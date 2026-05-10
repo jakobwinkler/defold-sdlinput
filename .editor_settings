@@ -5,48 +5,35 @@
   :code {
     :breakpoints [
     ]
+    :find {
+      :term "enabled"
+    }
   }
   :workflow {
     :open-tabs [
       [
         [
-          "/ext-sdlinput/api/sdlinput.script_api"
-          :code
-        ]
-        [
-          "/ext-sdlinput/ext.manifest"
-          :code
-        ]
-        [
-          "/game.project"
-          :cljfx-form-view
-        ]
-        [
-          "/builtins/input/default.gamepads"
-          :cljfx-form-view
-        ]
-        [
-          "/main/empty.gamepads"
-          :cljfx-form-view
-        ]
-        [
-          "/ext-sdlinput/src/extension.cpp"
-          :code
-        ]
-        [
-          "/ext-sdlinput/src/sdlinput_bridge.cpp"
-          :code
-        ]
-        [
           "/main/controller.script"
+          :code
+        ]
+        [
+          "/ext-sdlinput/api/sdlinput.script_api"
           :code
         ]
       ]
     ]
     :recent-files [
       [
-        "/ext-sdlinput/api/sdlinput.script_api"
+        "/main/main.appmanifest"
         :code
+      ]
+      [
+        "/ext-sdlinput/ext.manifest"
+        :code
+      ]
+      [
+        "/game.project"
+        :cljfx-form-view
       ]
       [
         "/builtins/input/default.gamepads"
@@ -57,10 +44,6 @@
         :cljfx-form-view
       ]
       [
-        "/ext-sdlinput/ext.manifest"
-        :code
-      ]
-      [
         "/ext-sdlinput/src/extension.cpp"
         :code
       ]
@@ -69,11 +52,11 @@
         :code
       ]
       [
-        "/game.project"
-        :cljfx-form-view
+        "/PLAN.md"
+        :html
       ]
       [
-        "/main/main.appmanifest"
+        "/ext-sdlinput/api/sdlinput.script_api"
         :code
       ]
       [

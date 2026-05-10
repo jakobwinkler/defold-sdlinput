@@ -1,2 +1,5 @@
 .internal/
+/.editor_settings
+/.internal
 build/
+/tags

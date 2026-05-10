@@ -129,7 +129,6 @@ case $PLATFORM in
     fi
     echo "Building SDL3 for WASM inside emscripten/emsdk container..."
     docker build -t sdl3-wasm-builder -f "$SCRIPT_DIR/Dockerfile.sdl3-wasm-build" "$SCRIPT_DIR"
-    local cid
     cid=$(docker create sdl3-wasm-builder:latest) || { echo "docker create failed"; exit 1; }
     mkdir -p "$OUT_DIR"
     docker cp "$cid:/SDL/build/libSDL3.a" "$OUT_DIR/"

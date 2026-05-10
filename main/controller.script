@@ -1,131 +1,111 @@
 -- Test script for SDLInput extension
 -- Opens all gamepads and prints state each frame
 
+local sdlinput = sdlinput
+
+-- Open gamepad at index i, enable sensors, store info in self.gps
+local function setup_gamepad(self, i)
+  local name = sdlinput.gamepad_name(i) or "N/A"
+  local gp = sdlinput.gamepad_open(i)
+  if not gp then
+    print(string.format("ERROR: gamepad_open(%d) failed for %s", i, name))
+    return false
+  end
+
+  local ge = sdlinput.gamepad_set_sensor_enabled(gp, "gyro", true)
+  local ae = sdlinput.gamepad_set_sensor_enabled(gp, "accel", true)
+
+  local info = {
+    index = i,
+    handle = gp,
+    name = name,
+    vid = sdlinput.gamepad_get_vid(gp),
+    pid = sdlinput.gamepad_get_pid(gp),
+    tp = sdlinput.gamepad_get_type(gp),
+    led = sdlinput.gamepad_has_led(gp),
+    gyro = ge or false,
+    acc = ae or false,
+  }
+  table.insert(self.gps, info)
+  pprint(info)
+  return true
+end
+
+local function scan_gamepads(self)
+  local n = sdlinput.num_gamepads()
+  print("Gamepads detected: " .. tostring(n))
+
+  if n and n > 0 then
+    for i = 0, n - 1 do
+      setup_gamepad(self, i)
+    end
+  else
+    print("No gamepads connected.")
+  end
+end
+
 function init(self)
-	print("--- SDLInput Test ---")
+  print("--- SDLInput Test ---")
 
-	local ok, err = sdlinput.init()
-	if not ok then
-		print("ERROR: sdlinput.init() failed: " .. tostring(err))
-		return
-	end
-	print("sdlinput.init() OK")
+  local ok, err = sdlinput.init()
+  if not ok then
+    print("ERROR: sdlinput.init() failed: " .. tostring(err))
+    return
+  end
+  print("sdlinput.init() OK")
 
-	-- Open all connected gamepads
-	self.gps = {}  -- array of {handle, name, vid, pid, type}
-	local n = sdlinput.num_gamepads()
-	print("Gamepads detected: " .. tostring(n))
+  -- Open all connected gamepads
+  self.gps = {}
+  if html5 then
+    timer.delay(5, false, scan_gamepads, self)
+  else
+    scan_gamepads(self)
+  end
 
-	if n and n > 0 then
-		for i = 0, n - 1 do
-			local name = sdlinput.gamepad_name(i) or "N/A"
-			local gp = sdlinput.gamepad_open(i)
-			if gp then
-				-- Enable sensors (gyro/accel) if controller supports them
-				local ge = sdlinput.gamepad_set_sensor_enabled(gp, "gyro", true)
-				local ae = sdlinput.gamepad_set_sensor_enabled(gp, "accel", true)
-				if ge then print("  Gyro enabled") end
-				if ae then print("  Accel enabled") end
-
-				local info = {
-					handle = gp,
-					name = name,
-					vid = sdlinput.gamepad_get_vid(gp),
-					pid = sdlinput.gamepad_get_pid(gp),
-					tp = sdlinput.gamepad_get_type(gp),
-					led = sdlinput.gamepad_has_led(gp)
-				}
-				table.insert(self.gps, info)
-				print(string.format("Opened [%d]: %s  VID=0x%04x PID=0x%04x Type=%s LED=%s",
-					i, name, info.vid, info.pid, info.tp, tostring(info.led)))
-			else
-				print(string.format("ERROR: gamepad_open(%d) failed for %s", i, name))
-			end
-		end
-	else
-		print("No gamepads connected.")
-	end
-
-	self.frame = 0
+  self.frame = 0
 end
 
 function update(self, dt)
-	self.frame = self.frame + 1
-	sdlinput.pump_events()
+  self.frame = self.frame + 1
+  sdlinput.pump_events()
 
-	-- Reconnect logic: check for new gamepads every 5 seconds
-	if #self.gps == 0 and self.frame % 300 == 0 then
-		local n = sdlinput.num_gamepads()
-		if n and n > 0 then
-			for i = 0, n - 1 do
-				local name = sdlinput.gamepad_name(i) or "N/A"
-				local gp = sdlinput.gamepad_open(i)
-				if gp then
-					sdlinput.gamepad_set_sensor_enabled(gp, "gyro", true)
-					sdlinput.gamepad_set_sensor_enabled(gp, "accel", true)
-					local info = {
-						handle = gp, name = name,
-						vid = sdlinput.gamepad_get_vid(gp),
-						pid = sdlinput.gamepad_get_pid(gp),
-						tp = sdlinput.gamepad_get_type(gp),
-						led = sdlinput.gamepad_has_led(gp)
-					}
-					table.insert(self.gps, info)
-					print("Late connect: opened " .. name)
-				end
-			end
-		end
-	end
+  -- Print state every 60 frames
+  if self.frame % 60 ~= 0 then return end
 
-	-- Print state every 60 frames
-	if self.frame % 60 ~= 0 then return end
+  for idx, gp in ipairs(self.gps) do
+    -- Buttons
+    local btns = sdlinput.gamepad_get_buttons(gp.handle)
+    local btn_str = ""
+    for k, v in pairs(btns) do
+      if v then btn_str = btn_str .. " " .. k end
+    end
 
-	for idx, gp in ipairs(self.gps) do
-		if not sdlinput.gamepad_connected(gp.handle) then
-			print(string.format("[Frame %d] GP%d disconnected", self.frame, idx - 1))
-			sdlinput.gamepad_close(gp.handle)
-			table.remove(self.gps, idx)
-			break
-		end
+    -- Axes
+    local axes = { "leftx", "lefty", "rightx", "righty", "left_trigger", "right_trigger" }
+    local axis_str = ""
+    for _, a in ipairs(axes) do
+      local val = sdlinput.gamepad_get_axis(gp.handle, a)
+      axis_str = axis_str .. string.format(" %s=%.2f", a, val)
+    end
 
-		-- Buttons
-		local btns = sdlinput.gamepad_get_buttons(gp.handle)
-		local btn_str = ""
-		for k, v in pairs(btns) do
-			if v then btn_str = btn_str .. " " .. k end
-		end
+    -- Sensor
+    local sens_str = ""
+    local gyro = sdlinput.gamepad_get_sensor(gp.handle, "gyro")
+    if gyro then sens_str = string.format(" Gyro:%.2f,%.2f,%.2f", gyro.x, gyro.y, gyro.z) end
+    local accel = sdlinput.gamepad_get_sensor(gp.handle, "accel")
+    if accel then sens_str = sens_str .. string.format(" Accel:%.2f,%.2f,%.2f", accel.x, accel.y, accel.z) end
 
-		-- Axes
-		local axes = { "leftx", "lefty", "rightx", "righty", "left_trigger", "right_trigger" }
-		local axis_str = ""
-		for _, a in ipairs(axes) do
-			local val = sdlinput.gamepad_get_axis(gp.handle, a)
-			axis_str = axis_str .. string.format(" %s=%.2f", a, val)
-		end
-
-		-- Sensor
-		local sens_str = ""
-		local gyro = sdlinput.gamepad_get_sensor(gp.handle, "gyro")
-		if gyro then sens_str = string.format(" Gyro:%.2f,%.2f,%.2f", gyro.x, gyro.y, gyro.z) end
-		local accel = sdlinput.gamepad_get_sensor(gp.handle, "accel")
-		if accel then sens_str = sens_str .. string.format(" Accel:%.2f,%.2f,%.2f", accel.x, accel.y, accel.z) end
-
-		print(string.format("[Frame %d GP%d] %s  %s%s%s",
-			self.frame, idx - 1, gp.name,
-			btn_str ~= "" and ("Btns:" .. btn_str) or "",
-			axis_str ~= "" and (" Axes:" .. axis_str) or "",
-			sens_str))
-	end
-end
-
-function on_message(self, message_id, message, sender)
+    print(string.format("[Frame %d GP%d] %s  %s%s%s", self.frame, idx - 1, gp.name, btn_str ~= "" and ("Btns:" .. btn_str) or "",
+      axis_str ~= "" and (" Axes:" .. axis_str) or "", sens_str))
+  end
 end
 
 function final(self)
-	for _, gp in ipairs(self.gps) do
-		sdlinput.gamepad_close(gp.handle)
-	end
-	self.gps = {}
-	sdlinput.quit()
-	print("--- SDLInput Test End ---")
+  for _, gp in ipairs(self.gps) do
+    sdlinput.gamepad_close(gp.handle)
+  end
+
+  self.gps = {}
+  sdlinput.quit()
+  print("--- SDLInput Test End ---")
 end
