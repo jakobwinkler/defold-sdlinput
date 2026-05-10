@@ -1,9 +1,9 @@
--- Test script for SDLInput extension
--- Opens all gamepads and prints state each frame
+-- Gyro visualization for SDLInput
+-- Integrates gyro angular velocity each frame to rotate 3D model.
 
 local sdlinput = sdlinput
 
--- Open gamepad at index i, enable sensors, store info in self.gps
+-- Open gamepad at index i, enable gyro
 local function setup_gamepad(self, i)
   local name = sdlinput.gamepad_name(i) or "N/A"
   local gp = sdlinput.gamepad_open(i)
@@ -12,8 +12,7 @@ local function setup_gamepad(self, i)
     return false
   end
 
-  local ge = sdlinput.gamepad_set_sensor_enabled(gp, "gyro", true)
-  local ae = sdlinput.gamepad_set_sensor_enabled(gp, "accel", true)
+  sdlinput.gamepad_set_sensor_enabled(gp, "gyro", true)
 
   local info = {
     index = i,
@@ -23,8 +22,7 @@ local function setup_gamepad(self, i)
     pid = sdlinput.gamepad_get_pid(gp),
     tp = sdlinput.gamepad_get_type(gp),
     led = sdlinput.gamepad_has_led(gp),
-    gyro = ge or false,
-    acc = ae or false,
+    gyro = true,
   }
   table.insert(self.gps, info)
   pprint(info)
@@ -44,8 +42,57 @@ local function scan_gamepads(self)
   end
 end
 
+-- Integrate gyro angular velocity into orientation each frame
+local function update_orientation(self, dt)
+  if not self.gps or #self.gps == 0 then return end
+
+  local gp = self.gps[1]
+  if not sdlinput.gamepad_connected(gp.handle) then return end
+
+  local gyro = sdlinput.gamepad_get_sensor(gp.handle, "gyro")
+  if not gyro then return end
+
+  local g = vmath.vector3(gyro.x, gyro.y, gyro.z)
+  local g_len = vmath.length(g)
+  if g_len > 0.001 then
+    local dq = vmath.quat_axis_angle(g / g_len, g_len * dt)
+    self.orientation = vmath.normalize(self.orientation * dq)
+    go.set_rotation(self.orientation, "controller")
+  end
+end
+
+local function print_state(self)
+  if not self.gps then return end
+  for idx, gp in ipairs(self.gps) do
+    if not sdlinput.gamepad_connected(gp.handle) then
+      print(string.format("GP%d (%s) DISCONNECTED", idx - 1, gp.name))
+      return
+    end
+
+    local btns = sdlinput.gamepad_get_buttons(gp.handle)
+    local btn_str = ""
+    for k, v in pairs(btns) do
+      if v then btn_str = btn_str .. " " .. k end
+    end
+
+    local axes = { "leftx", "lefty", "rightx", "righty", "left_trigger", "right_trigger" }
+    local axis_str = ""
+    for _, a in ipairs(axes) do
+      local val = sdlinput.gamepad_get_axis(gp.handle, a)
+      axis_str = axis_str .. string.format(" %s=%.2f", a, val)
+    end
+
+    local sens_str = ""
+    local gyro = sdlinput.gamepad_get_sensor(gp.handle, "gyro")
+    if gyro then sens_str = string.format(" Gyro:%.2f,%.2f,%.2f", gyro.x, gyro.y, gyro.z) end
+
+    print(string.format("GP%d %s | Btns:%s | Axes:%s%s", idx - 1, gp.name,
+      btn_str ~= "" and btn_str or "-", axis_str ~= "" and axis_str or "-", sens_str))
+  end
+end
+
 function init(self)
-  print("--- SDLInput Test ---")
+  print("--- SDLInput Gyro Demo ---")
 
   local ok, err = sdlinput.init()
   if not ok then
@@ -54,7 +101,6 @@ function init(self)
   end
   print("sdlinput.init() OK")
 
-  -- Open all connected gamepads
   self.gps = {}
   if html5 then
     timer.delay(5, false, scan_gamepads, self)
@@ -62,50 +108,22 @@ function init(self)
     scan_gamepads(self)
   end
 
-  self.frame = 0
+  self.orientation = vmath.quat()
+
+  -- Print state every 2 seconds
+  timer.delay(2, true, print_state, self)
 end
 
 function update(self, dt)
-  self.frame = self.frame + 1
   sdlinput.pump_events()
-
-  -- Print state every 60 frames
-  if self.frame % 60 ~= 0 then return end
-
-  for idx, gp in ipairs(self.gps) do
-    -- Buttons
-    local btns = sdlinput.gamepad_get_buttons(gp.handle)
-    local btn_str = ""
-    for k, v in pairs(btns) do
-      if v then btn_str = btn_str .. " " .. k end
-    end
-
-    -- Axes
-    local axes = { "leftx", "lefty", "rightx", "righty", "left_trigger", "right_trigger" }
-    local axis_str = ""
-    for _, a in ipairs(axes) do
-      local val = sdlinput.gamepad_get_axis(gp.handle, a)
-      axis_str = axis_str .. string.format(" %s=%.2f", a, val)
-    end
-
-    -- Sensor
-    local sens_str = ""
-    local gyro = sdlinput.gamepad_get_sensor(gp.handle, "gyro")
-    if gyro then sens_str = string.format(" Gyro:%.2f,%.2f,%.2f", gyro.x, gyro.y, gyro.z) end
-    local accel = sdlinput.gamepad_get_sensor(gp.handle, "accel")
-    if accel then sens_str = sens_str .. string.format(" Accel:%.2f,%.2f,%.2f", accel.x, accel.y, accel.z) end
-
-    print(string.format("[Frame %d GP%d] %s  %s%s%s", self.frame, idx - 1, gp.name, btn_str ~= "" and ("Btns:" .. btn_str) or "",
-      axis_str ~= "" and (" Axes:" .. axis_str) or "", sens_str))
-  end
+  update_orientation(self, dt)
 end
 
 function final(self)
   for _, gp in ipairs(self.gps) do
     sdlinput.gamepad_close(gp.handle)
   end
-
   self.gps = {}
   sdlinput.quit()
-  print("--- SDLInput Test End ---")
+  print("--- SDLInput Gyro Demo End ---")
 end

@@ -1,6 +1,17 @@
 {
   :bundle {
-    :last-bundle-command :project.bundle-windows
+    :html5 {
+      :architectures #{
+        "wasm-web"
+      }
+      :build_report false
+      :contentless false
+      :liveupdate false
+      :texture_compression "enabled"
+      :variant "debug"
+      :with_symbols false
+    }
+    :last-bundle-command :project.bundle-html5
     :output-directory "/home/jakob/Documents/gamedev/defold-sdlinput/bundle"
     :windows {
       :build_report false
@@ -16,7 +27,7 @@
     :breakpoints [
     ]
     :find {
-      :term "enabled"
+      :term "orientation"
     }
   }
   :workflow {
@@ -28,6 +39,14 @@
         ]
         [
           "/ext-sdlinput/api/sdlinput.script_api"
+          :code
+        ]
+        [
+          "/main/main.collection"
+          :scene
+        ]
+        [
+          "/main/render.render_script"
           :code
         ]
       ]
@@ -71,6 +90,14 @@
       ]
       [
         "/main/controller.script"
+        :code
+      ]
+      [
+        "/main/main.collection"
+        :scene
+      ]
+      [
+        "/main/render.render_script"
         :code
       ]
     ]

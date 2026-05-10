@@ -1,6 +1,21 @@
 function init(self)
+	self.view = vmath.matrix4()
+	self.proj = vmath.matrix4()
 	self.clear_color = vmath.vector4(0.16, 0.164, 0.184, 1.0)
+
 	render.enable_state(graphics.STATE_DEPTH_TEST)
+	render.enable_state(graphics.STATE_CULL_FACE)
+
+	self.model_pred = render.predicate({ hash("model") })
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("set_view_projection") then
+		self.view = message.view
+		self.proj = message.projection or vmath.matrix4()
+	elseif message_id == hash("clear_color") then
+		self.clear_color = message.color
+	end
 end
 
 function update(self)
@@ -8,10 +23,23 @@ function update(self)
 	local h = render.get_window_height()
 
 	render.set_depth_mask(true)
+	render.set_stencil_mask(0xff)
 	render.clear({
 		[graphics.BUFFER_TYPE_COLOR0_BIT] = self.clear_color,
 		[graphics.BUFFER_TYPE_DEPTH_BIT] = 1
 	})
 
 	render.set_viewport(0, 0, w, h)
+	render.set_view(self.view)
+	render.set_projection(self.proj)
+
+	render.set_blend_func(
+		graphics.BLEND_FACTOR_SRC_ALPHA,
+		graphics.BLEND_FACTOR_ONE_MINUS_SRC_ALPHA
+	)
+	render.enable_state(graphics.STATE_DEPTH_TEST)
+	render.enable_state(graphics.STATE_CULL_FACE)
+	render.set_depth_mask(true)
+
+	render.draw(self.model_pred)
 end
