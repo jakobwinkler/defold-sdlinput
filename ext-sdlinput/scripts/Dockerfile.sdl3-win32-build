@@ -1,0 +1,102 @@
+# Build SDL3 as a static library for x86_64-windows (cross-compiled with Clang + xwin)
+# Uses Ubuntu 20.04 to match extender's glibc ABI
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system deps and LLVM 19 from apt.llvm.org
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+    ca-certificates \
+    cmake \
+    curl \
+    git \
+    gnupg \
+    lsb-release \
+    software-properties-common \
+    wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
+    && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-19 main" \
+    && apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends \
+        build-essential \
+        clang-19 \
+        lld-19 \
+        llvm-19-dev \
+        libclang-19-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/bin/clang-19 /usr/bin/clang \
+    && ln -s /usr/bin/clang++-19 /usr/bin/clang++ \
+    && ln -s /usr/bin/llvm-ar-19 /usr/bin/llvm-ar \
+    && ln -s /usr/bin/llvm-ranlib-19 /usr/bin/llvm-ranlib \
+    && ln -s /usr/bin/lld-link-19 /usr/bin/lld-link
+
+# Install xwin (statically linked musl binary) — downloads Windows SDK/MSVC CRT
+RUN curl -L https://github.com/Jake-Shadle/xwin/releases/download/0.9.0/xwin-0.9.0-x86_64-unknown-linux-musl.tar.gz \
+    | tar -xz --no-same-owner --strip-components=1 \
+    && mv xwin /usr/local/bin/
+
+# Splat Windows SDK + MSVC CRT into /xwin
+# Note: xwin 0.9.0 downloads the latest Windows SDK automatically
+RUN xwin --accept-license splat --output /xwin
+
+ARG SDL_TAG=release-3.2.x
+
+# Clone SDL3 — pin to a specific tag for reproducible builds
+RUN git clone --depth 1 --branch $SDL_TAG https://github.com/libsdl-org/SDL /SDL
+
+# Remove WGI and GameInput sources (pull in setupapi deps not in extender)
+RUN rm -f /SDL/src/joystick/windows/SDL_windows_gaming_input.c \
+       /SDL/src/core/windows/SDL_gameinput.cpp \
+       /SDL/src/core/windows/SDL_gameinput.h
+
+# Copy toolchain file for win32 cross-compile
+COPY sdl3-win32-toolchain.cmake /SDL/
+
+WORKDIR /SDL
+
+# Configure with minimal subsystem set (no video/audio/render, only input subsystems)
+# Note: SDL_HIDAPI_LIBUSB=OFF because libusb is Linux-only; no shared variant on Windows
+# Force-disable WGI and GameInput to avoid link dependency on setupapi/oleaut32.
+RUN rm -rf build && cmake -B build \
+    -DCMAKE_TOOLCHAIN_FILE=sdl3-win32-toolchain.cmake \
+    -DHAVE_WINDOWS_GAMING_INPUT_H=NO \
+    -DHAVE_GAMEINPUT_H=NO \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DSDL_STATIC=ON \
+    -DSDL_STATIC_PIC=ON \
+    -DSDL_JOYSTICK=ON \
+    -DSDL_HIDAPI=ON \
+    -DSDL_SENSOR=OFF \
+    -DSDL_HAPTIC=ON \
+    -DSDL_POWER=ON \
+    -DSDL_VIDEO=OFF \
+    -DSDL_AUDIO=OFF \
+    -DSDL_RENDER=OFF \
+    -DSDL_GPU=OFF \
+    -DSDL_CAMERA=OFF \
+    -DSDL_DIALOG=OFF \
+    -DSDL_TRAY=OFF \
+    -DSDL_PROCESS=OFF \
+    -DSDL_STORAGE=OFF \
+    -DSDL_X11=OFF \
+    -DSDL_WAYLAND=OFF \
+    -DSDL_OPENGL=OFF \
+    -DSDL_VULKAN=OFF \
+    -DSDL_METAL=OFF \
+    -DSDL_DIRECTX=OFF \
+    -DSDL_ALSA=OFF \
+    -DSDL_PULSEAUDIO=OFF \
+    -DSDL_PIPEWIRE=OFF \
+    -DSDL_IBUS=OFF \
+    -DSDL_FCITX=OFF \
+    -DSDL_LIBURING=OFF \
+    -DSDL_VIRTUAL_JOYSTICK=OFF \
+    -DSDL_LIBUDEV=OFF \
+    -DSDL_DBUS=OFF \
+    -DSDL_HIDAPI_LIBUSB=OFF \
+    && cmake --build build -j$(nproc) --target SDL3-static
+
+# Verify build output (main SDL3 library only, not test targets)
+RUN ls -lh build/libSDL3.a && nm build/libSDL3.a | grep -q ' T SDL_GetGamepads' \
+    && echo "SDL3 Win32 build OK" || echo "WARNING: SDL_GetGamepads not found"

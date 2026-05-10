@@ -7,8 +7,10 @@ RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+ARG SDL_TAG=release-3.2.x
+
 # Clone SDL3
-RUN git clone --depth 1 --branch release-3.2.x https://github.com/libsdl-org/SDL /SDL
+RUN git clone --depth 1 --branch $SDL_TAG https://github.com/libsdl-org/SDL /SDL
 
 WORKDIR /SDL
 
@@ -36,6 +38,6 @@ RUN emcmake cmake -B build \
     -DSDL_STORAGE=OFF \
     && emmake cmake --build build -j$(nproc)
 
-# Verify build output
-RUN ls -lh build/libSDL3.a && nm build/libSDL3.a | grep -q ' T SDL_GetGamepads' \
+# Verify build output (wasm objects use bitcode, need emnm/llvm-nm)
+RUN ls -lh build/libSDL3.a && emnm build/libSDL3.a 2>/dev/null | grep -q ' T SDL_GetGamepads' \
     && echo "SDL3 WASM build OK" || echo "WARNING: SDL_GetGamepads not found"

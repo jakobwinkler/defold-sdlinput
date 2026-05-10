@@ -1,6 +1,16 @@
 {
   :bundle {
-    :last-bundle-command :project.bundle-linux
+    :last-bundle-command :project.bundle-windows
+    :output-directory "/home/jakob/Documents/gamedev/defold-sdlinput/bundle"
+    :windows {
+      :build_report false
+      :contentless false
+      :liveupdate false
+      :platform "x86_64-win32"
+      :texture_compression "enabled"
+      :variant "debug"
+      :with_symbols true
+    }
   }
   :code {
     :breakpoints [

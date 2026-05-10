@@ -14,8 +14,10 @@ RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     libusb-1.0-0-dev \
     && rm -rf /var/lib/apt/lists/*
 
+ARG SDL_TAG=release-3.2.x
+
 # Clone SDL3 — pin to a specific tag for reproducible builds
-RUN git clone --depth 1 --branch release-3.2.x https://github.com/libsdl-org/SDL /SDL
+RUN git clone --depth 1 --branch $SDL_TAG https://github.com/libsdl-org/SDL /SDL
 
 WORKDIR /SDL
 

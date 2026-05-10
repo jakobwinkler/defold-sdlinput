@@ -2,4 +2,5 @@
 /.editor_settings
 /.internal
 build/
+bundle/
 /tags
