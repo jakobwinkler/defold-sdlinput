@@ -1,25 +1,25 @@
 # SDLInput
 
-Defold native extension for raw SDL input handling.
+Defold native extension wrapping SDL3 gamepad, joystick, and HID APIs. Gives raw access to gamepads beyond what Defold's built-in input system provides, especially rumble, LEDs, and sensors (gyro/accel).
 
-## Structure
+Built on SDL3's gamepad layer. Tested on Linux, Windows, and WASM (web).
 
-```
-defold-sdlinput/
-├── game.project         # Project settings
-├── ext-sdlinput/        # Native extension
-│   ├── ext.manifest     # Extension manifest
-│   ├── api/             # Script API definitions
-│   │   └── sdlinput.script_api
-│   ├── src/             # Source code (C/C++)
-│   │   └── extension.cpp
-│   └── include/         # Public headers
-├── main/                # Game scripts and collections
-│   ├── main.collection
-│   └── controller.script
-└── README.md
-```
+- Web does not support sensors due to browser issues (it's a mess). Make sure to interact with the page before querying devices.
+- MacOS should be possible with some more work, but I have no way to test.
 
-## Build
+The project structure and API is a hot mess right now, but I guess it works.
 
-Open in Defold editor and build, or use the editor CLI.
+## Usage
+
+See example project in repository root.
+
+## Dependencies
+
+The native extension is built by shipping a prebuilt, stripped-down .a/.lib
+file to extender (to avoid working around the environment setup in extender).
+The files are in the repo for convenience and can be build using the provided
+docker images in `ext-sdlinput/scripts`.
+
+## License
+
+MIT. See `LICENSE`.
