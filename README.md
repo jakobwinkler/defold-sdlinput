@@ -2,6 +2,8 @@
 
 Defold native extension wrapping SDL3 gamepad, joystick, and HID APIs. Gives raw access to gamepads beyond what Defold's built-in input system provides, especially rumble, LEDs, and sensors (gyro/accel).
 
+https://github.com/user-attachments/assets/a57ac490-2b31-4c80-b5f0-82589439aee2
+
 Built on SDL3's gamepad layer. Tested on Linux, Windows, and WASM (web).
 
 - Web does not support sensors due to browser issues (it's a mess). Make sure to interact with the page before querying devices.
