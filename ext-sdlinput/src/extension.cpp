@@ -6,31 +6,30 @@
 
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_gamepad.h>
-#include <SDL3/SDL_hidapi.h>
 #include <SDL3/SDL_error.h>
 
-// Declared in sdlinput_bridge.cpp
-void sdlinput_register(lua_State* L);
-void sdlinput_close_all_handles();
+#include <sdlinput_bindings.h>
+#include <motionhelper_bindings.h>
 
 static dmExtension::Result AppInitializeSDLInput(dmExtension::AppParams* params)
 {
     if (!SDL_Init(SDL_INIT_GAMEPAD)) {
         dmLogError("SDLInput: SDL_Init failed: %s", SDL_GetError());
-        return dmExtension::RESULT_OK; // continue even if init fails
     }
+
+    // continue even if init fails
     return dmExtension::RESULT_OK;
 }
 
 static dmExtension::Result InitializeSDLInput(dmExtension::Params* params)
 {
     sdlinput_register(params->m_L);
+    motionhelper_register(params->m_L);
     return dmExtension::RESULT_OK;
 }
 
 static dmExtension::Result FinalizeSDLInput(dmExtension::Params* params)
 {
-    sdlinput_close_all_handles();
     SDL_Quit();
     return dmExtension::RESULT_OK;
 }

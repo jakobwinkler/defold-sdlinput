@@ -27,7 +27,7 @@
     :breakpoints [
     ]
     :find {
-      :term "orientation"
+      :term "mh_accelv"
     }
   }
   :workflow {
@@ -49,15 +49,15 @@
           "/main/render.render_script"
           :code
         ]
+        [
+          "/ext-sdlinput/ext.manifest"
+          :code
+        ]
       ]
     ]
     :recent-files [
       [
         "/main/main.appmanifest"
-        :code
-      ]
-      [
-        "/ext-sdlinput/ext.manifest"
         :code
       ]
       [
@@ -89,15 +89,19 @@
         :code
       ]
       [
-        "/main/controller.script"
-        :code
-      ]
-      [
         "/main/main.collection"
         :scene
       ]
       [
         "/main/render.render_script"
+        :code
+      ]
+      [
+        "/ext-sdlinput/ext.manifest"
+        :code
+      ]
+      [
+        "/main/controller.script"
         :code
       ]
     ]

@@ -1,9 +1,7 @@
--- Gyro visualization for SDLInput
--- Integrates gyro angular velocity each frame to rotate 3D model.
-
 local sdlinput = sdlinput
+local motionhelper = motionhelper
 
--- Open gamepad at index i, enable gyro
+-- Open gamepad at index i, enable gyro + accel
 local function setup_gamepad(self, i)
   local name = sdlinput.gamepad_name(i) or "N/A"
   local gp = sdlinput.gamepad_open(i)
@@ -12,7 +10,15 @@ local function setup_gamepad(self, i)
     return false
   end
 
-  sdlinput.gamepad_set_sensor_enabled(gp, "gyro", true)
+  local have_gyro  = sdlinput.gamepad_set_sensor_enabled(gp, sdlinput.SENSOR_GYRO, true)
+  local have_accel = sdlinput.gamepad_set_sensor_enabled(gp, sdlinput.SENSOR_ACCEL, true)
+
+  if not have_gyro then
+    print(string.format("WARNING: Gyro sensor not available on %s", name))
+  end
+  if not have_accel then
+    print(string.format("WARNING: Accel sensor not available on %s", name))
+  end
 
   local info = {
     index = i,
@@ -22,7 +28,8 @@ local function setup_gamepad(self, i)
     pid = sdlinput.gamepad_get_pid(gp),
     tp = sdlinput.gamepad_get_type(gp),
     led = sdlinput.gamepad_has_led(gp),
-    gyro = true,
+    have_gyro  = have_gyro,
+    have_accel = have_accel,
   }
   table.insert(self.gps, info)
   pprint(info)
@@ -42,22 +49,81 @@ local function scan_gamepads(self)
   end
 end
 
--- Integrate gyro angular velocity into orientation each frame
+-- Process gyro/accel and integrate player-space gyro into yaw/pitch
+-- SDL returns gyro in rad/s, accel in m/s^2.
+-- motionhelper expects deg/s and G-force :/
+local RAD_TO_DEG = 57.2957795
+local G_FORCE = 9.80665
+
 local function update_orientation(self, dt)
   if not self.gps or #self.gps == 0 then return end
+  if not self.motion then return end
 
   local gp = self.gps[1]
   if not sdlinput.gamepad_connected(gp.handle) then return end
 
-  local gyro = sdlinput.gamepad_get_sensor(gp.handle, "gyro")
+  local gyro = sdlinput.gamepad_get_sensor(gp.handle, sdlinput.SENSOR_GYRO)
   if not gyro then return end
 
-  local g = vmath.vector3(gyro.x, gyro.y, gyro.z)
-  local g_len = vmath.length(g)
-  if g_len > 0.001 then
-    local dq = vmath.quat_axis_angle(g / g_len, g_len * dt)
-    self.orientation = vmath.normalize(self.orientation * dq)
-    go.set_rotation(self.orientation, "controller")
+  local accel = sdlinput.gamepad_get_sensor(gp.handle, sdlinput.SENSOR_ACCEL)
+  if not accel then
+    -- No accel sensor: pass zero so motionhelper still processes gyro
+    accel = { x = 0, y = 0, z = 0 }
+  end
+
+  -- Convert SDL units -> motionhelper units
+  local mh_gyro = {
+    x = gyro.x * RAD_TO_DEG,
+    y = gyro.y * RAD_TO_DEG,
+    z = gyro.z * RAD_TO_DEG,
+  }
+  local mh_accel = {
+    x = accel.x / G_FORCE,
+    y = accel.y / G_FORCE,
+    z = accel.z / G_FORCE,
+  }
+
+  self.motion:process(mh_gyro, mh_accel, dt)
+
+  -- Get player-space gyro: pitch (x), yaw (y)
+  local pitch_deg, yaw_deg = self.motion:get_player_space_gyro()
+
+  -- Integrate into accumulated angles
+  self.yaw   = self.yaw   + yaw_deg   * dt
+  self.pitch = self.pitch + pitch_deg * dt
+
+  local rot = vmath.quat_rotation_y(math.rad(self.yaw)) * vmath.quat_rotation_x(math.rad(self.pitch))
+  go.set_rotation(rot, "controller")
+end
+
+local function handle_calibration(self)
+  if not self.gps or #self.gps == 0 then return end
+  local gp = self.gps[1]
+  if not sdlinput.gamepad_connected(gp.handle) then return end
+
+  local btns = sdlinput.gamepad_get_button(gp.handle, sdlinput.BUTTON_START)
+
+  if btns and not self.cal_triggered then
+    print("=== Calibration START: keep controller still ===")
+    self.motion:reset_calibration()
+    self.motion:start_calibration()
+    self.cal_triggered = true
+    self.cal_timer = 0
+  elseif btns and self.cal_triggered then
+    -- Button held — accumulate time
+    self.cal_timer = (self.cal_timer or 0) + (self.cal_dt or 0)
+    if self.cal_timer >= 1.0 then
+      print("=== Calibration END (1s sample complete) ===")
+      self.motion:pause_calibration()
+      self.cal_triggered = false
+      self.cal_timer = nil
+    end
+  elseif not btns and self.cal_triggered then
+    -- Button released before 1s — end calibration early
+    print("=== Calibration END (early) ===")
+    self.motion:pause_calibration()
+    self.cal_triggered = false
+    self.cal_timer = nil
   end
 end
 
@@ -75,25 +141,43 @@ local function print_state(self)
       if v then btn_str = btn_str .. " " .. k end
     end
 
-    local axes = { "leftx", "lefty", "rightx", "righty", "left_trigger", "right_trigger" }
+    local axes = {
+      { "leftx", sdlinput.AXIS_LEFTX },
+      { "lefty", sdlinput.AXIS_LEFTY },
+      { "rightx", sdlinput.AXIS_RIGHTX },
+      { "righty", sdlinput.AXIS_RIGHTY },
+      { "left_trigger", sdlinput.AXIS_LEFT_TRIGGER },
+      { "right_trigger", sdlinput.AXIS_RIGHT_TRIGGER }
+    }
     local axis_str = ""
     for _, a in ipairs(axes) do
-      local val = sdlinput.gamepad_get_axis(gp.handle, a)
-      axis_str = axis_str .. string.format(" %s=%.2f", a, val)
+      local val = sdlinput.gamepad_get_axis(gp.handle, a[2])
+      axis_str = axis_str .. string.format(" %s=%.2f", a[1], val)
     end
 
-    local sens_str = ""
-    local gyro = sdlinput.gamepad_get_sensor(gp.handle, "gyro")
-    if gyro then sens_str = string.format(" Gyro:%.2f,%.2f,%.2f", gyro.x, gyro.y, gyro.z) end
-
-    print(string.format("GP%d %s | Btns:%s | Axes:%s%s", idx - 1, gp.name,
-      btn_str ~= "" and btn_str or "-", axis_str ~= "" and axis_str or "-", sens_str))
+    if self.motion then
+      local pitch, yaw = self.motion:get_player_space_gyro()
+      local cal = self.cal_triggered and "CAL" or "   "
+      local t = self.cal_timer or 0
+      local raw_gyro = sdlinput.gamepad_get_sensor(gp.handle, sdlinput.SENSOR_GYRO)
+      local rdeg = raw_gyro and string.format("R:%.2f,%.2f,%.2f",
+        raw_gyro.x * RAD_TO_DEG, raw_gyro.y * RAD_TO_DEG, raw_gyro.z * RAD_TO_DEG) or "R:none"
+      print(string.format("GP%d %s %s | P:%.0f Y:%.0f | GyroPS:%.1f,%.1f | %s | Cal:%.1fs %s",
+        idx - 1, gp.name, cal,
+        self.pitch or 0, self.yaw or 0,
+        pitch, yaw,
+        rdeg,
+        t, btn_str))
+    else
+      print(string.format("GP%d %s | Btns:%s | Axes:%s",
+        idx - 1, gp.name,
+        btn_str ~= "" and btn_str or "-",
+        axis_str ~= "" and axis_str or "-"))
+    end
   end
 end
 
 function init(self)
-  print("--- SDLInput Gyro Demo ---")
-
   local ok, err = sdlinput.init()
   if not ok then
     print("ERROR: sdlinput.init() failed: " .. tostring(err))
@@ -108,7 +192,19 @@ function init(self)
     scan_gamepads(self)
   end
 
-  self.orientation = vmath.quat()
+  -- Create motionhelper handle, manual calibration (no auto-cal)
+  local m = motionhelper.new()
+  if m then
+    m:set_calibration_mode("manual")
+    self.motion = m
+    print("MotionHelper created, calibration mode: manual")
+  else
+    print("ERROR: motionhelper.new() failed")
+  end
+
+  self.yaw = 0
+  self.pitch = 0
+  self.cal_triggered = false
 
   -- Print state every 2 seconds
   timer.delay(2, true, print_state, self)
@@ -116,14 +212,24 @@ end
 
 function update(self, dt)
   sdlinput.pump_events()
+
+  self.cal_dt = dt
+  handle_calibration(self)
+
   update_orientation(self, dt)
 end
 
 function final(self)
+  if self.motion then
+    if self.cal_triggered then
+      self.motion:pause_calibration()
+    end
+    self.motion:free()
+    self.motion = nil
+  end
   for _, gp in ipairs(self.gps) do
     sdlinput.gamepad_close(gp.handle)
   end
   self.gps = {}
   sdlinput.quit()
-  print("--- SDLInput Gyro Demo End ---")
 end
